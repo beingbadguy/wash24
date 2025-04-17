@@ -110,7 +110,7 @@ export default function LoginPage() {
               href="/auth/signup"
               className="text-sm text-[#BE185D] hover:text-[#9D174D]"
             >
-              Don`&apos;`t have an account? Sign up
+              Don&apos;t have an account? Sign up
             </Link>
           </div>
         </form>

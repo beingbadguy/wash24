@@ -136,7 +136,7 @@ export default function AgentsPage() {
                           <div className="grid grid-cols-3 gap-4">
                             <div className="bg-gray-50 p-4 rounded-lg">
                               <p className="text-sm text-gray-500">
-                                Today`&apos;`s Orders
+                                Today&apos;s Orders
                               </p>
                               <p className="text-2xl font-bold">
                                 {agent.reports.today}
@@ -204,7 +204,7 @@ export default function AgentsPage() {
                           <div className="grid grid-cols-3 gap-4">
                             <div className="bg-gray-50 p-4 rounded-lg">
                               <p className="text-sm text-gray-500">
-                                Today`&apos;`s Earnings
+                                Today&apos;s Earnings
                               </p>
                               <p className="text-2xl font-bold">
                                 ₹{agent.earnings.today}
