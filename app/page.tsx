@@ -40,10 +40,10 @@ type RevenueData = {
   amount: number;
 };
 
-// type OrderStat = {
-//   name: string;
-//   value: number;
-// };
+type OrderStat = {
+  name: string;
+  value: number;
+};
 
 export default function DashboardPage() {
   const revenueData: RevenueData[] = [
@@ -53,175 +53,212 @@ export default function DashboardPage() {
     { month: "Apr", amount: 34.0 },
   ];
 
-  // const orderStats: OrderStat[] = [
-  //   { name: "Orders in Progress", value: 92 },
-  //   { name: "Completed Orders", value: 81 },
-  //   { name: "Cancelled Orders", value: 48 },
-  //   { name: "New Orders", value: 92 },
-  // ];
+  const orderStats: OrderStat[] = [
+    { name: "Orders in Progress", value: 92 },
+    { name: "Completed Orders", value: 81 },
+    { name: "Cancelled Orders", value: 48 },
+    { name: "New Orders", value: 92 },
+  ];
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-      </div>
-      <Separator />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$45,231.89</div>
-            <p className="text-xs text-muted-foreground">
-              +20.1% from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+2350</div>
-            <p className="text-xs text-muted-foreground">
-              +180.1% from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+12,234</div>
-            <p className="text-xs text-muted-foreground">
-              +19% from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Agents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeAgents.length}</div>
-            <p className="text-xs text-muted-foreground">
-              +201 since last hour
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Revenue Overview</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Bar dataKey="amount" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-8">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center">
-                  <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {order.service}
-                    </p>
-                    <p className="text-sm text-gray-500">{order.date}</p>
-                    <Badge variant={getStatusVariant(order.status)}>
-                      {order.status}
-                    </Badge>
+    <div className="p-6 space-y-6 overflow-y-scroll max-h-[90vh] pb-20">
+      <h1 className="text-3xl font-bold">Dashboard</h1>
+
+      {/* Recent Orders Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Orders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentOrders.map((order) => (
+              <div
+                key={order.id}
+                className="flex items-center justify-between p-4 border rounded-lg"
+              >
+                <div className="flex items-center space-x-4">
+                  <div>
+                    <p className="font-medium">Order #{order.id}</p>
+                    <p className="text-sm text-gray-500">{order.service}</p>
                   </div>
-                  <div className="ml-auto font-medium">+$25.00</div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+                <div className="flex items-center space-x-4">
+                  <p className="text-sm text-gray-500">{order.date}</p>
+                  <Badge variant={getStatusVariant(order.status)}>
+                    {order.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delivery Agents Status Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
           <CardHeader>
             <CardTitle>Active Delivery Agents</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-8">
+            <div className="space-y-4">
               {activeAgents.map((agent) => (
-                <div key={agent.id} className="flex items-center">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={agent.avatar} alt={agent.name} />
+                <div key={agent.id} className="flex items-center space-x-4">
+                  <Avatar>
+                    <AvatarImage src={agent.avatar} />
                     <AvatarFallback>
-                      {agent.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {agent.name.substring(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {agent.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
+                  <div>
+                    <p className="font-medium">{agent.name}</p>
+                    <p className="text-sm text-gray-500">
                       {agent.currentOrder
                         ? `Order #${agent.currentOrder}`
                         : "Available"}
                     </p>
                   </div>
-                  <div className="ml-auto">
-                    <Badge
-                      variant={agent.currentOrder ? "default" : "secondary"}
-                    >
-                      {agent.currentOrder ? "On Delivery" : "Available"}
-                    </Badge>
-                  </div>
+                  <Badge variant="secondary" className="ml-auto">
+                    Active
+                  </Badge>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-        <Card className="col-span-3">
+
+        <Card>
           <CardHeader>
-            <CardTitle>Inactive Agents</CardTitle>
+            <CardTitle>Inactive Delivery Agents</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-8">
+            <div className="space-y-4">
               {inactiveAgents.map((agent) => (
-                <div key={agent.id} className="flex items-center">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={agent.avatar} alt={agent.name} />
+                <div key={agent.id} className="flex items-center space-x-4">
+                  <Avatar>
+                    <AvatarImage src={agent.avatar} />
                     <AvatarFallback>
-                      {agent.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {agent.name.substring(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {agent.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
+                  <div>
+                    <p className="font-medium">{agent.name}</p>
+                    <p className="text-sm text-gray-500">
                       Last active: {agent.lastActive}
                     </p>
                   </div>
+                  <Badge variant="outline" className="ml-auto">
+                    Inactive
+                  </Badge>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="flex w-full">
+        <div className="flex-1 overflow-auto">
+          <main className="p-6 space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Revenue Chart */}
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-semibold">Total Revenue</h2>
+                  <select className="px-3 py-1 border rounded-md bg-gray-50 cursor-pointer">
+                    <option>Filter</option>
+                    <option>Daily</option>
+                    <option>Monthly</option>
+                    <option>Yearly</option>
+                  </select>
+                </div>
+
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={revenueData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Bar dataKey="amount" fill="#9D215D" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 space-y-2 grid grid-cols-2 gap-4">
+                  <div>
+                    <p>January - 99.42 Lakh</p>
+                    <p>February - 75.12 Lakh</p>
+                    <p>March - 84.92 Lakh</p>
+                    <p>April - 34.00 Lakh</p>
+                  </div>
+
+                  <div className="flex">
+                    <Separator
+                      orientation="vertical"
+                      className="h-24 w-px bg-gray-300 mx-4"
+                    />
+                    <div className="w-full flex items-center justify-center flex-col gap-2 font-bold">
+                      <p className="text-[#9D215D]">Total Revenue</p>
+                      <p>80 Lakh</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Orders Chart */}
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-semibold">Total Orders</h2>
+                  <select className="px-3 py-1 border rounded-md bg-gray-50 cursor-pointer">
+                    <option>Filter</option>
+                    <option>Daily</option>
+                    <option>Monthly</option>
+                    <option>Yearly</option>
+                  </select>
+                </div>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={orderStats}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Bar dataKey="value" fill="#9D215D" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <p>Orders in Progress - 92</p>
+                    <p>Completed Orders - 81</p>
+                    <p>Cancelled Orders - 48</p>
+                    <p>New Orders - 92</p>
+                  </div>
+                  <div className="flex">
+                    <Separator
+                      orientation="vertical"
+                      className="h-24 w-px bg-gray-300 mx-4"
+                    />
+                    <div className="w-full flex items-center justify-center flex-col gap-2 font-bold">
+                      <p className="text-[#9D215D]">Total Orders</p>
+                      <p>313</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h2 className="text-lg font-semibold mb-6">Total Revenue</h2>
+                <p className="text-3xl font-bold">80 Lakh</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h2 className="text-lg font-semibold mb-6">Total Orders</h2>
+                <p className="text-3xl font-bold">313</p>
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
