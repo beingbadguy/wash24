@@ -10,7 +10,7 @@ import {
   Tags,
   Settings,
   HelpCircle,
-  // FileBarChart,
+  MessageCircle,
   LogOut,
 } from "lucide-react";
 import Image from "next/image";
@@ -21,10 +21,9 @@ const menuItems = [
   { icon: UserCog, label: "Delivery Agent", href: "/agents" },
   { icon: Users, label: "Users", href: "/users" },
   { icon: Tags, label: "Service & Pricing", href: "/services" },
-  // { icon: Tags, label: "Offers", href: "/offers" },
   { icon: Settings, label: "Settings", href: "/settings" },
-  // { icon: FileBarChart, label: "Reports & Analytics", href: "/reports" },
-  { icon: HelpCircle, label: "Help", href: "/help" },
+  { icon: HelpCircle, label: "FAQ", href: "/help" },
+  { icon: MessageCircle, label: "Support", href: "/support" },
 ];
 
 export function Sidebar() {
@@ -33,21 +32,14 @@ export function Sidebar() {
   return (
     <div className="h-screen w-64 bg-white border-r p-4 flex flex-col">
       <div className="flex items-center gap-2 px-2 mb-8 justify-center">
-        <Image
-          src="/logo.jpeg"
-          alt="Wash24"
-          // className="h-8 w-8"
-          height={120}
-          width={120}
-        />
-        {/* <span className="text-xl font-semibold">Wash24</span> */}
+        <Image src="/logo.jpeg" alt="Wash24" height={120} width={120} />
       </div>
 
       <nav className="flex-1">
         <ul className="space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href;  
             return (
               <li key={item.href}>
                 <Link
@@ -67,7 +59,7 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <button className="flex items-center gap-3 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg mt-auto">
+      <button className=" gap-3 px-3 py-2  hover:bg-gray-100 cursor-pointer rounded-lg mt-auto bg-gray-200 text-black flex items-center justify-center w-full">
         <LogOut size={20} />
         <span>Log Out</span>
       </button>
