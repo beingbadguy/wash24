@@ -3,6 +3,9 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import {
   Building2,
   Phone,
@@ -11,9 +14,161 @@ import {
   Clock,
   Globe,
   IndianRupee,
+  Shirt,
+  ShowerHead,
+  Sparkles,
+  ChevronRight,
+  Plus,
+  X,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// Mock data for services
+const initialServicesData = [
+  {
+    category: "Laundry",
+    icon: Shirt,
+    subcategories: [
+      { name: "Regular Wash", price: "₹50/kg" },
+      { name: "Dry Clean", price: "₹100/item" },
+      { name: "Express Wash", price: "₹80/kg" },
+    ],
+  },
+  {
+    category: "Dry Cleaning",
+    icon: ShowerHead,
+    subcategories: [
+      { name: "Suit", price: "₹200" },
+      { name: "Coat", price: "₹180" },
+      { name: "Dress", price: "₹150" },
+    ],
+  },
+  {
+    category: "Ironing",
+    icon: Sparkles,
+    subcategories: [
+      { name: "Regular Iron", price: "₹30/item" },
+      { name: "Steam Press", price: "₹50/item" },
+      { name: "Bulk Ironing", price: "₹25/item" },
+    ],
+  },
+];
 
 export default function SettingsPage() {
+  const [services, setServices] = useState(initialServicesData);
+  const [newCategory, setNewCategory] = useState("");
+  const [newSubcategory, setNewSubcategory] = useState({ name: "", price: "" });
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isAddingSubcategory, setIsAddingSubcategory] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    type: "category" | "subcategory";
+    category?: string;
+    subcategory?: string;
+  }>({
+    isOpen: false,
+    type: "category",
+  });
+
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      setServices([
+        ...services,
+        {
+          category: newCategory,
+          icon: Shirt, // Default icon
+          subcategories: [],
+        },
+      ]);
+      setNewCategory("");
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleAddSubcategory = () => {
+    if (
+      selectedCategory &&
+      newSubcategory.name.trim() &&
+      newSubcategory.price.trim()
+    ) {
+      setServices(
+        services.map((service) =>
+          service.category === selectedCategory
+            ? {
+                ...service,
+                subcategories: [
+                  ...service.subcategories,
+                  {
+                    name: newSubcategory.name,
+                    price: newSubcategory.price,
+                  },
+                ],
+              }
+            : service
+        )
+      );
+      setNewSubcategory({ name: "", price: "" });
+      setIsAddingSubcategory(false);
+    }
+  };
+
+  const handleDeleteCategory = (category: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      type: "category",
+      category,
+    });
+  };
+
+  const handleDeleteSubcategory = (
+    category: string,
+    subcategoryName: string
+  ) => {
+    setDeleteDialog({
+      isOpen: true,
+      type: "subcategory",
+      category,
+      subcategory: subcategoryName,
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleteDialog.type === "category" && deleteDialog.category) {
+      setServices(
+        services.filter((service) => service.category !== deleteDialog.category)
+      );
+    } else if (
+      deleteDialog.type === "subcategory" &&
+      deleteDialog.category &&
+      deleteDialog.subcategory
+    ) {
+      setServices(
+        services.map((service) =>
+          service.category === deleteDialog.category
+            ? {
+                ...service,
+                subcategories: service.subcategories.filter(
+                  (sub) => sub.name !== deleteDialog.subcategory
+                ),
+              }
+            : service
+        )
+      );
+    }
+    setDeleteDialog({ isOpen: false, type: "category" });
+  };
+
   return (
     <div className="container p-6 max-w-7xl mx-auto max-h-[90vh] overflow-y-scroll">
       <div className="space-y-6">
@@ -28,17 +183,24 @@ export default function SettingsPage() {
           <TabsList className="bg-white border p-1 shadow-sm rounded-xl">
             <TabsTrigger
               value="business"
-              className="gap-2 rounded-lg data-[state=active]:bg-[#9D215D] data-[state=active]:text-white transition-all"
+              className="gap-2 rounded-lg data-[state=active]:bg-[#9D215D] data-[state=active]:text-white transition-all cursor-pointer"
             >
               <Building2 className="h-4 w-4" />
               Business Info
             </TabsTrigger>
             <TabsTrigger
               value="hours"
-              className="gap-2 rounded-lg data-[state=active]:bg-[#9D215D] data-[state=active]:text-white transition-all"
+              className="gap-2 rounded-lg data-[state=active]:bg-[#9D215D] data-[state=active]:text-white transition-all cursor-pointer"
             >
               <Clock className="h-4 w-4" />
               Working Hours
+            </TabsTrigger>
+            <TabsTrigger
+              value="services"
+              className="gap-2 rounded-lg data-[state=active]:bg-[#9D215D] data-[state=active]:text-white transition-all cursor-pointer"
+            >
+              <Shirt className="h-4 w-4" />
+              Services
             </TabsTrigger>
           </TabsList>
 
@@ -147,7 +309,206 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="services">
+            <Card className="border-none shadow-md">
+              <CardHeader className="border-b bg-gray-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-semibold flex items-center gap-2 text-[#9D215D]">
+                    <Shirt className="h-5 w-5" />
+                    Services & Pricing
+                  </CardTitle>
+                  <Button
+                    onClick={() => setIsAddingCategory(true)}
+                    className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Category
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {isAddingCategory && (
+                  <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+                    <div className="flex gap-4">
+                      <Input
+                        placeholder="Category Name"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        className="flex-1 cursor-text"
+                      />
+                      <Button
+                        onClick={handleAddCategory}
+                        className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddingCategory(false)}
+                        className="cursor-pointer"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  {services.map((service) => (
+                    <div
+                      key={service.category}
+                      className="border rounded-lg overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between p-4 bg-gray-50 border-b">
+                        <div className="flex items-center gap-3">
+                          <service.icon className="h-5 w-5 text-[#9D215D]" />
+                          <h3 className="font-semibold text-gray-800">
+                            {service.category}
+                          </h3>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCategory(service.category);
+                              setIsAddingSubcategory(true);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Subcategory
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteCategory(service.category)
+                            }
+                            className="cursor-pointer"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="divide-y">
+                        {isAddingSubcategory &&
+                          selectedCategory === service.category && (
+                            <div className="p-4 bg-gray-50">
+                              <div className="flex gap-4">
+                                <Input
+                                  placeholder="Subcategory Name"
+                                  value={newSubcategory.name}
+                                  onChange={(e) =>
+                                    setNewSubcategory({
+                                      ...newSubcategory,
+                                      name: e.target.value,
+                                    })
+                                  }
+                                  className="flex-1 cursor-text"
+                                />
+                                <Input
+                                  placeholder="Price"
+                                  value={newSubcategory.price}
+                                  onChange={(e) =>
+                                    setNewSubcategory({
+                                      ...newSubcategory,
+                                      price: e.target.value,
+                                    })
+                                  }
+                                  className="w-32 cursor-text"
+                                />
+                                <Button
+                                  onClick={handleAddSubcategory}
+                                  className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
+                                >
+                                  Add
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setIsAddingSubcategory(false);
+                                    setNewSubcategory({ name: "", price: "" });
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        {service.subcategories.map((subcategory) => (
+                          <div
+                            key={subcategory.name}
+                            className="flex items-center justify-between p-4 hover:bg-gray-50/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <ChevronRight className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-700">
+                                {subcategory.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[#9D215D] font-medium">
+                                {subcategory.price}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleDeleteSubcategory(
+                                    service.category,
+                                    subcategory.name
+                                  )
+                                }
+                                className="cursor-pointer"
+                              >
+                                <X className="h-4 w-4 text-gray-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
+
+        <AlertDialog
+          open={deleteDialog.isOpen}
+          onOpenChange={() =>
+            setDeleteDialog({ isOpen: false, type: "category" })
+          }
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                {deleteDialog.type === "category"
+                  ? `Are you sure you want to delete the "${deleteDialog.category}" category? This will also delete all its subcategories.`
+                  : `Are you sure you want to delete the "${deleteDialog.subcategory}" subcategory from "${deleteDialog.category}"?`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="cursor-pointer">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700 cursor-pointer"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
