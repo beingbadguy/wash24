@@ -11,7 +11,6 @@ import api from "@/lib/axios";
 import { AxiosError } from "axios";
 import { useAuthStore } from "@/store/store";
 import Cookies from "js-cookie";
-import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -74,16 +73,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
-        <div className="flex items-center gap-2 px-2 mb-8 justify-center">
-          <Image
-            src="/logo.jpeg"
-            alt="Wash24"
-            width={120}
-            height={120}
-            className="object-contain"
-            priority
-          />
-        </div>
         <div className="text-center">
           <h2 className="text-3xl font-extrabold bg-gradient-to-r from-[#9D215D] to-[#CD3883] text-transparent bg-clip-text">
             Welcome back
