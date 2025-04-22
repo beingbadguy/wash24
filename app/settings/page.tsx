@@ -172,12 +172,12 @@ export default function SettingsPage() {
   return (
     <div className="container p-6 max-w-7xl mx-auto max-h-[90vh] overflow-y-scroll">
       <div className="space-y-6">
-        <div>
+          <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#9D215D] to-[#CD3883] text-transparent bg-clip-text">
             Settings
           </h1>
           <p className="text-gray-500">Business Information</p>
-        </div>
+          </div>
 
         <Tabs defaultValue="business" className="space-y-4">
           <TabsList className="bg-white border p-1 shadow-sm rounded-xl">
@@ -221,7 +221,7 @@ export default function SettingsPage() {
                         <Avatar className="h-12 w-12">
                           <AvatarImage
                             src="/logo.jpeg"
-                            alt="Wash24 Logo"
+              alt="Wash24 Logo"
                             className="object-contain"
                           />
                           <AvatarFallback>W24</AvatarFallback>
@@ -270,9 +270,9 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+          </div>
+        </CardContent>
+      </Card>
           </TabsContent>
 
           <TabsContent value="hours">
@@ -302,12 +302,12 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-base">9:00 AM - 9:00 PM</span>
-                      </div>
-                    </div>
+          </div>
+          </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
+          </div>
+        </CardContent>
+      </Card>
           </TabsContent>
 
           <TabsContent value="services">
@@ -470,11 +470,11 @@ export default function SettingsPage() {
                           </div>
                         ))}
                       </div>
-                    </div>
+          </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
+          </div>
+        </CardContent>
+      </Card>
           </TabsContent>
         </Tabs>
 
@@ -509,7 +509,7 @@ export default function SettingsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+          </div>
     </div>
   );
 }

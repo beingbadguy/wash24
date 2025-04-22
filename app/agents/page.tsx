@@ -112,6 +112,8 @@ export default function AgentsPage() {
     1,
     Math.ceil(filteredAgents.length / itemsPerPage)
   );
+
+  
   const currentAgents = filteredAgents.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
