@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import React, { useState, useEffect } from "react";
 import {
   Building2,
@@ -34,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import api from "@/lib/axios";
+import { uploadImageToCloudinary } from "@/lib/cloudinaryImageUpload";
 
 interface Subcategory {
   name: string;
@@ -60,9 +64,23 @@ interface CategoryResponse {
   imageUrl: string | null;
 }
 
+interface NewCategory {
+  name: string;
+  description: string;
+  showOnHome: boolean;
+  imageUrl: string | null;
+  sortOrder: number;
+}
+
 export default function SettingsPage() {
   const [services, setServices] = useState<Service[]>([]);
-  const [newCategory, setNewCategory] = useState("");
+  const [newCategory, setNewCategory] = useState<NewCategory>({
+    name: "",
+    description: "",
+    showOnHome: true,
+    imageUrl: null,
+    sortOrder: 0,
+  });
   const [newSubcategory, setNewSubcategory] = useState<Subcategory>({
     name: "",
     price: "",
@@ -81,6 +99,7 @@ export default function SettingsPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchCategories = async () => {
     setIsLoadingCategories(true);
@@ -88,6 +107,7 @@ export default function SettingsPage() {
       const response = await api.get(
         "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/categories"
       );
+      console.log(response.data);
       if (response.data.success) {
         const transformedServices: Service[] = response.data.data.map(
           (category: CategoryResponse) => ({
@@ -115,25 +135,46 @@ export default function SettingsPage() {
     fetchCategories();
   }, []);
 
+  const handleImageUpload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const imageUrl = await uploadImageToCloudinary(file);
+      setNewCategory((prev) => ({
+        ...prev,
+        imageUrl,
+      }));
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+      setNewCategory((prev) => ({
+        ...prev,
+        imageUrl: null,
+      }));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleAddCategory = async () => {
-    if (newCategory.trim()) {
+    if (newCategory.name.trim()) {
       setIsLoading(true);
       try {
         const response = await api.post(
           "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/categories",
-          {
-            name: newCategory,
-            description: `This is description of ${newCategory} service`,
-            imageUrl: null,
-            showOnHome: true,
-            sortOrder: 0,
-          }
+          newCategory
         );
 
         if (response.data.success) {
           toast.success("Category added successfully");
           await fetchCategories();
-          setNewCategory("");
+          setNewCategory({
+            name: "",
+            description: "",
+            showOnHome: true,
+            imageUrl: null,
+            sortOrder: 0,
+          });
           setIsAddingCategory(false);
         }
       } catch (error) {
@@ -384,39 +425,128 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     {isAddingCategory && (
-                      <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-                        <div className="flex gap-4">
-                          <Input
-                            placeholder="Category Name"
-                            value={newCategory}
-                            onChange={(e) => setNewCategory(e.target.value)}
-                            className="flex-1 cursor-text"
-                            disabled={isLoading}
-                          />
-                          <Button
-                            onClick={handleAddCategory}
-                            className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Adding...
-                              </>
-                            ) : (
-                              "Add"
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsAddingCategory(false)}
-                            className="cursor-pointer"
-                            disabled={isLoading}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
+                      <Card className="my-3">
+                        <CardHeader>
+                          <CardTitle>Add New Category</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="categoryName">Name</Label>
+                              <Input
+                                id="categoryName"
+                                placeholder="Enter category name"
+                                value={newCategory.name}
+                                onChange={(e) =>
+                                  setNewCategory((prev) => ({
+                                    ...prev,
+                                    name: e.target.value,
+                                  }))
+                                }
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="categoryDescription">
+                                Description
+                              </Label>
+                              <Textarea
+                                id="categoryDescription"
+                                placeholder="Enter category description"
+                                value={newCategory.description}
+                                onChange={(e) =>
+                                  setNewCategory((prev) => ({
+                                    ...prev,
+                                    description: e.target.value,
+                                  }))
+                                }
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="categoryImage">
+                                Upload Image (Optional)
+                              </Label>
+                              <div className="flex items-center gap-4">
+                                <Input
+                                  id="categoryImage"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      handleImageUpload(file);
+                                    }
+                                  }}
+                                  disabled={isUploading}
+                                />
+                                {isUploading && (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                )}
+                                {newCategory.imageUrl && (
+                                  <img
+                                    src={newCategory.imageUrl}
+                                    alt="Preview"
+                                    className="h-10 w-10 object-cover rounded"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id="showOnHome"
+                                checked={newCategory.showOnHome}
+                                onCheckedChange={(checked) =>
+                                  setNewCategory((prev) => ({
+                                    ...prev,
+                                    showOnHome: checked,
+                                  }))
+                                }
+                              />
+                              <Label htmlFor="showOnHome">Show on home</Label>
+                            </div>
+
+                            <div className="flex justify-end gap-4">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setIsAddingCategory(false);
+                                  setNewCategory({
+                                    name: "",
+                                    description: "",
+                                    showOnHome: true,
+                                    imageUrl: null,
+                                    sortOrder: 0,
+                                  });
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={handleAddCategory}
+                                disabled={
+                                  isLoading ||
+                                  !newCategory.name.trim() ||
+                                  !newCategory.description.trim()
+                                }
+                                className="bg-[#9D215D] hover:bg-[#CD3883]"
+                              >
+                                {isLoading ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Adding...
+                                  </>
+                                ) : (
+                                  "Save"
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
 
                     <div className="space-y-6">
@@ -427,12 +557,25 @@ export default function SettingsPage() {
                         >
                           <div className="flex items-center justify-between p-4 bg-gray-50 border-b">
                             <div className="flex items-center gap-3">
-                              {React.createElement(service.icon, {
-                                className: "h-5 w-5 text-[#9D215D]",
-                              })}
-                              <h3 className="font-semibold text-gray-800">
-                                {service.category}
-                              </h3>
+                              {service.imageUrl ? (
+                                <img
+                                  src={service.imageUrl}
+                                  alt={service.category}
+                                  className="h-8 w-8 object-cover rounded-md"
+                                />
+                              ) : (
+                                <Shirt className="h-5 w-5 text-[#9D215D]" />
+                              )}
+                              <div>
+                                <h3 className="font-semibold text-gray-800">
+                                  {service.category}
+                                </h3>
+                                {service.description && (
+                                  <p className="text-sm text-gray-500">
+                                    {service.description}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="flex gap-2">
                               <Button

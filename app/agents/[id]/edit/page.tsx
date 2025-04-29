@@ -41,6 +41,41 @@ interface ApiError {
   message: string;
 }
 
+interface ApiDocument {
+  documentType: string;
+  documentUrl: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface ApiResponse {
+  data: {
+    personalInfo: {
+      fullName: string;
+      email: string;
+      phone: string;
+      emergencyContact: string;
+    };
+    addressInfo: {
+      address: string;
+      city: string;
+      pinCode: string;
+    };
+    vehicleInfo: {
+      vehicleNumber: string;
+      vehicleType: string;
+    };
+    bankInfo: {
+      accountNumber: string;
+      ifscCode: string;
+      bankName: string;
+      accountHolderName: string;
+    };
+    documents: ApiDocument[];
+    status: string;
+  };
+}
+
 export default function EditAgentPage({
   params,
 }: {
@@ -90,7 +125,7 @@ export default function EditAgentPage({
   useEffect(() => {
     const fetchAgentData = async () => {
       try {
-        const response = await api.get(
+        const response = await api.get<ApiResponse>(
           `/admin/delivery-agent/${resolvedParams.id}`
         );
         const agentData = response.data.data;
@@ -117,7 +152,7 @@ export default function EditAgentPage({
             bankName: agentData.bankInfo?.bankName || "",
             accountHolderName: agentData.bankInfo?.accountHolderName || "",
           },
-          documents: agentData.documents?.map((doc: any) => ({
+          documents: agentData.documents?.map((doc: ApiDocument) => ({
             documentType: doc.documentType || "",
             documentUrl: doc.documentUrl || "",
           })) || [
