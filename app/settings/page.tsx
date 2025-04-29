@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Building2,
   Phone,
@@ -15,12 +15,12 @@ import {
   Globe,
   IndianRupee,
   Shirt,
-  ShowerHead,
-  Sparkles,
   ChevronRight,
   Plus,
   X,
   AlertTriangle,
+  Loader2,
+  LucideIcon,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -32,42 +32,41 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import api from "@/lib/axios";
 
-// Mock data for services
-const initialServicesData = [
-  {
-    category: "Laundry",
-    icon: Shirt,
-    subcategories: [
-      { name: "Regular Wash", price: "₹50/kg" },
-      { name: "Dry Clean", price: "₹100/item" },
-      { name: "Express Wash", price: "₹80/kg" },
-    ],
-  },
-  {
-    category: "Dry Cleaning",
-    icon: ShowerHead,
-    subcategories: [
-      { name: "Suit", price: "₹200" },
-      { name: "Coat", price: "₹180" },
-      { name: "Dress", price: "₹150" },
-    ],
-  },
-  {
-    category: "Ironing",
-    icon: Sparkles,
-    subcategories: [
-      { name: "Regular Iron", price: "₹30/item" },
-      { name: "Steam Press", price: "₹50/item" },
-      { name: "Bulk Ironing", price: "₹25/item" },
-    ],
-  },
-];
+interface Subcategory {
+  name: string;
+  price: string;
+}
+
+interface Service {
+  category: string;
+  icon: LucideIcon;
+  subcategories: Subcategory[];
+  description?: string;
+  id?: string;
+  showOnHome?: boolean;
+  sortOrder?: number;
+  imageUrl?: string | null;
+}
+
+interface CategoryResponse {
+  name: string;
+  description: string;
+  id: string;
+  showOnHome: boolean;
+  sortOrder: number;
+  imageUrl: string | null;
+}
 
 export default function SettingsPage() {
-  const [services, setServices] = useState(initialServicesData);
+  const [services, setServices] = useState<Service[]>([]);
   const [newCategory, setNewCategory] = useState("");
-  const [newSubcategory, setNewSubcategory] = useState({ name: "", price: "" });
+  const [newSubcategory, setNewSubcategory] = useState<Subcategory>({
+    name: "",
+    price: "",
+  });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isAddingSubcategory, setIsAddingSubcategory] = useState(false);
@@ -80,19 +79,69 @@ export default function SettingsPage() {
     isOpen: false,
     type: "category",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
-  const handleAddCategory = () => {
+  const fetchCategories = async () => {
+    setIsLoadingCategories(true);
+    try {
+      const response = await api.get(
+        "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/categories"
+      );
+      if (response.data.success) {
+        const transformedServices: Service[] = response.data.data.map(
+          (category: CategoryResponse) => ({
+            category: category.name,
+            icon: Shirt as LucideIcon,
+            subcategories: [],
+            description: category.description,
+            id: category.id,
+            showOnHome: category.showOnHome,
+            sortOrder: category.sortOrder,
+            imageUrl: category.imageUrl,
+          })
+        );
+        setServices(transformedServices);
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast.error("Failed to fetch categories");
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const handleAddCategory = async () => {
     if (newCategory.trim()) {
-      setServices([
-        ...services,
-        {
-          category: newCategory,
-          icon: Shirt, // Default icon
-          subcategories: [],
-        },
-      ]);
-      setNewCategory("");
-      setIsAddingCategory(false);
+      setIsLoading(true);
+      try {
+        const response = await api.post(
+          "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/categories",
+          {
+            name: newCategory,
+            description: `This is description of ${newCategory} service`,
+            imageUrl: null,
+            showOnHome: true,
+            sortOrder: 0,
+          }
+        );
+
+        if (response.data.success) {
+          toast.success("Category added successfully");
+          await fetchCategories();
+          setNewCategory("");
+          setIsAddingCategory(false);
+        }
+      } catch (error) {
+        console.error("Error adding category:", error);
+        toast.error("Failed to add category");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -172,12 +221,12 @@ export default function SettingsPage() {
   return (
     <div className="container p-6 max-w-7xl mx-auto max-h-[90vh] overflow-y-scroll">
       <div className="space-y-6">
-          <div>
+        <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#9D215D] to-[#CD3883] text-transparent bg-clip-text">
             Settings
           </h1>
           <p className="text-gray-500">Business Information</p>
-          </div>
+        </div>
 
         <Tabs defaultValue="business" className="space-y-4">
           <TabsList className="bg-white border p-1 shadow-sm rounded-xl">
@@ -221,7 +270,7 @@ export default function SettingsPage() {
                         <Avatar className="h-12 w-12">
                           <AvatarImage
                             src="/logo.jpeg"
-              alt="Wash24 Logo"
+                            alt="Wash24 Logo"
                             className="object-contain"
                           />
                           <AvatarFallback>W24</AvatarFallback>
@@ -270,9 +319,9 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="hours">
@@ -302,12 +351,12 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-base">9:00 AM - 9:00 PM</span>
-          </div>
-          </div>
+                      </div>
+                    </div>
                   ))}
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="services">
@@ -328,153 +377,176 @@ export default function SettingsPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                {isAddingCategory && (
-                  <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-                    <div className="flex gap-4">
-                      <Input
-                        placeholder="Category Name"
-                        value={newCategory}
-                        onChange={(e) => setNewCategory(e.target.value)}
-                        className="flex-1 cursor-text"
-                      />
-                      <Button
-                        onClick={handleAddCategory}
-                        className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
-                      >
-                        Add
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsAddingCategory(false)}
-                        className="cursor-pointer"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
+                {isLoadingCategories ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                   </div>
-                )}
-
-                <div className="space-y-6">
-                  {services.map((service) => (
-                    <div
-                      key={service.category}
-                      className="border rounded-lg overflow-hidden"
-                    >
-                      <div className="flex items-center justify-between p-4 bg-gray-50 border-b">
-                        <div className="flex items-center gap-3">
-                          <service.icon className="h-5 w-5 text-[#9D215D]" />
-                          <h3 className="font-semibold text-gray-800">
-                            {service.category}
-                          </h3>
-                        </div>
-                        <div className="flex gap-2">
+                ) : (
+                  <>
+                    {isAddingCategory && (
+                      <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+                        <div className="flex gap-4">
+                          <Input
+                            placeholder="Category Name"
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            className="flex-1 cursor-text"
+                            disabled={isLoading}
+                          />
                           <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedCategory(service.category);
-                              setIsAddingSubcategory(true);
-                            }}
-                            className="cursor-pointer"
+                            onClick={handleAddCategory}
+                            className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
+                            disabled={isLoading}
                           >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Subcategory
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              "Add"
+                            )}
                           </Button>
                           <Button
                             variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              handleDeleteCategory(service.category)
-                            }
+                            onClick={() => setIsAddingCategory(false)}
                             className="cursor-pointer"
+                            disabled={isLoading}
                           >
-                            <X className="h-4 w-4" />
+                            Cancel
                           </Button>
                         </div>
                       </div>
-                      <div className="divide-y">
-                        {isAddingSubcategory &&
-                          selectedCategory === service.category && (
-                            <div className="p-4 bg-gray-50">
-                              <div className="flex gap-4">
-                                <Input
-                                  placeholder="Subcategory Name"
-                                  value={newSubcategory.name}
-                                  onChange={(e) =>
-                                    setNewSubcategory({
-                                      ...newSubcategory,
-                                      name: e.target.value,
-                                    })
-                                  }
-                                  className="flex-1 cursor-text"
-                                />
-                                <Input
-                                  placeholder="Price"
-                                  value={newSubcategory.price}
-                                  onChange={(e) =>
-                                    setNewSubcategory({
-                                      ...newSubcategory,
-                                      price: e.target.value,
-                                    })
-                                  }
-                                  className="w-32 cursor-text"
-                                />
-                                <Button
-                                  onClick={handleAddSubcategory}
-                                  className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
-                                >
-                                  Add
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    setIsAddingSubcategory(false);
-                                    setNewSubcategory({ name: "", price: "" });
-                                  }}
-                                  className="cursor-pointer"
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
+                    )}
+
+                    <div className="space-y-6">
+                      {services.map((service) => (
+                        <div
+                          key={service.category}
+                          className="border rounded-lg overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between p-4 bg-gray-50 border-b">
+                            <div className="flex items-center gap-3">
+                              {React.createElement(service.icon, {
+                                className: "h-5 w-5 text-[#9D215D]",
+                              })}
+                              <h3 className="font-semibold text-gray-800">
+                                {service.category}
+                              </h3>
                             </div>
-                          )}
-                        {service.subcategories.map((subcategory) => (
-                          <div
-                            key={subcategory.name}
-                            className="flex items-center justify-between p-4 hover:bg-gray-50/50 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <ChevronRight className="h-4 w-4 text-gray-400" />
-                              <span className="text-gray-700">
-                                {subcategory.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[#9D215D] font-medium">
-                                {subcategory.price}
-                              </span>
+                            <div className="flex gap-2">
                               <Button
-                                variant="ghost"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedCategory(service.category);
+                                  setIsAddingSubcategory(true);
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Subcategory
+                              </Button>
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() =>
-                                  handleDeleteSubcategory(
-                                    service.category,
-                                    subcategory.name
-                                  )
+                                  handleDeleteCategory(service.category)
                                 }
                                 className="cursor-pointer"
                               >
-                                <X className="h-4 w-4 text-gray-500" />
+                                <X className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-          </div>
-                  ))}
-          </div>
-        </CardContent>
-      </Card>
+                          <div className="divide-y">
+                            {isAddingSubcategory &&
+                              selectedCategory === service.category && (
+                                <div className="p-4 bg-gray-50">
+                                  <div className="flex gap-4">
+                                    <Input
+                                      placeholder="Subcategory Name"
+                                      value={newSubcategory.name}
+                                      onChange={(e) =>
+                                        setNewSubcategory({
+                                          ...newSubcategory,
+                                          name: e.target.value,
+                                        })
+                                      }
+                                      className="flex-1 cursor-text"
+                                    />
+                                    <Input
+                                      placeholder="Price"
+                                      value={newSubcategory.price}
+                                      onChange={(e) =>
+                                        setNewSubcategory({
+                                          ...newSubcategory,
+                                          price: e.target.value,
+                                        })
+                                      }
+                                      className="w-32 cursor-text"
+                                    />
+                                    <Button
+                                      onClick={handleAddSubcategory}
+                                      className="bg-[#9D215D] hover:bg-[#CD3883] cursor-pointer"
+                                    >
+                                      Add
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setIsAddingSubcategory(false);
+                                        setNewSubcategory({
+                                          name: "",
+                                          price: "",
+                                        });
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            {service.subcategories.map((subcategory) => (
+                              <div
+                                key={subcategory.name}
+                                className="flex items-center justify-between p-4 hover:bg-gray-50/50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                                  <span className="text-gray-700">
+                                    {subcategory.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[#9D215D] font-medium">
+                                    {subcategory.price}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDeleteSubcategory(
+                                        service.category,
+                                        subcategory.name
+                                      )
+                                    }
+                                    className="cursor-pointer"
+                                  >
+                                    <X className="h-4 w-4 text-gray-500" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
@@ -509,7 +581,7 @@ export default function SettingsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-          </div>
+      </div>
     </div>
   );
 }

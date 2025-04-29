@@ -9,10 +9,12 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/axios";
 import { AxiosError } from "axios";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 interface Document {
   documentType: string;
   documentUrl: string;
+  file?: File;
 }
 
 interface FormSection {
@@ -155,24 +157,43 @@ export default function AddAgentPage() {
     }
   };
 
-  const handleDocumentUrlChange = (documentType: string, url: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: prev.documents.map((doc) =>
-        doc.documentType === documentType ? { ...doc, documentUrl: url } : doc
-      ),
-    }));
+  const handleFileChange = async (documentType: string, file: File) => {
+    try {
+      // Update the file in the form data
+      setFormData((prev) => ({
+        ...prev,
+        documents: prev.documents.map((doc) =>
+          doc.documentType === documentType ? { ...doc, file } : doc
+        ),
+      }));
 
-    // Clear error when document URL is modified
-    const docIndex = formData.documents.findIndex(
-      (doc) => doc.documentType === documentType
-    );
-    if (errors[`documents.${docIndex}.documentUrl`]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[`documents.${docIndex}.documentUrl`];
-        return newErrors;
-      });
+      // Upload to Cloudinary
+      const secureUrl = await uploadToCloudinary(file);
+
+      // Update the document URL
+      setFormData((prev) => ({
+        ...prev,
+        documents: prev.documents.map((doc) =>
+          doc.documentType === documentType
+            ? { ...doc, documentUrl: secureUrl }
+            : doc
+        ),
+      }));
+
+      // Clear any existing errors
+      const docIndex = formData.documents.findIndex(
+        (doc) => doc.documentType === documentType
+      );
+      if (errors[`documents.${docIndex}.documentUrl`]) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[`documents.${docIndex}.documentUrl`];
+          return newErrors;
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      toast.error("Failed to upload document. Please try again.");
     }
   };
 
@@ -395,16 +416,31 @@ export default function AddAgentPage() {
                 <Label htmlFor={`document-${doc.documentType}`}>
                   {doc.documentType}
                 </Label>
-                <Input
-                  id={`document-${doc.documentType}`}
-                  type="text"
-                  value={doc.documentUrl}
-                  onChange={(e) =>
-                    handleDocumentUrlChange(doc.documentType, e.target.value)
-                  }
-                  placeholder={`Enter ${doc.documentType} URL`}
-                  required
-                />
+                <div className="flex items-center gap-4">
+                  <Input
+                    id={`document-${doc.documentType}`}
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleFileChange(doc.documentType, file);
+                      }
+                    }}
+                    className="flex-1"
+                  />
+
+                  {doc.documentUrl && (
+                    <a
+                      href={doc.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      View Document
+                    </a>
+                  )}
+                </div>
                 {errors[`documents.${index}.documentUrl`] && (
                   <p className="text-sm text-red-500">
                     {errors[`documents.${index}.documentUrl`]}

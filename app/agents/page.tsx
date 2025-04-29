@@ -19,6 +19,8 @@ import {
   MapPin,
   Car,
   CreditCard,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAgentsStore } from "@/store/agents";
 import api from "@/lib/axios";
@@ -91,7 +93,8 @@ interface AgentDetails {
 
 export default function AgentsPage() {
   const router = useRouter();
-  const { agents, isLoading, error, fetchAgents } = useAgentsStore();
+  const { agents, isLoading, error, fetchAgents } =
+    useAgentsStore();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [showOrderReport, setShowOrderReport] = useState(false);
   const [showEarningsReport, setShowEarningsReport] = useState(false);
@@ -103,10 +106,40 @@ export default function AgentsPage() {
   const [selectedAgentDetails, setSelectedAgentDetails] =
     useState<AgentDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // Initial fetch
   useEffect(() => {
-    fetchAgents();
+    fetchAgents(1, 6);
   }, [fetchAgents]);
+
+  // Filter agents based on search query
+  const filteredAgents = agents.filter(
+    (agent) =>
+      agent.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agent.phone.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Calculate pagination for filtered results
+  const totalFilteredItems = filteredAgents.length;
+  const totalFilteredPages = Math.ceil(totalFilteredItems / 6);
+  const startIndex = (currentPage - 1) * 6;
+  const endIndex = startIndex + 6;
+  const currentAgents = filteredAgents.slice(startIndex, endIndex);
+
+  // Handle search
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (!searchQuery) {
+      fetchAgents(newPage, 6);
+    }
+  };
 
   const handleViewOrderReport = (agent: Agent) => {
     setSelectedAgent(agent);
@@ -180,12 +213,6 @@ export default function AgentsPage() {
     }
   };
 
-  const filteredAgents = agents.filter(
-    (agent) =>
-      agent.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agent.phone.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
     <div className="container p-6 mx-auto max-h-[90vh] overflow-y-scroll w-full">
       <div className="flex items-center justify-between mb-6">
@@ -211,7 +238,7 @@ export default function AgentsPage() {
               placeholder="Search agents by name or phone..."
               className="pl-10 max-w-full border-0 bg-gray-50 focus-visible:ring-0 focus-visible:ring-offset-0"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
         </div>
@@ -248,7 +275,7 @@ export default function AgentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAgents.map((agent) => (
+                {currentAgents.map((agent) => (
                   <tr key={agent.id} className="border-b">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
@@ -346,10 +373,64 @@ export default function AgentsPage() {
                     </td>
                   </tr>
                 ))}
+                {currentAgents.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4 text-gray-500">
+                      No agents found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-4 py-3 border-t">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>
+              Showing {currentAgents.length > 0 ? startIndex + 1 : 0} to{" "}
+              {Math.min(endIndex, totalFilteredItems)} of {totalFilteredItems}{" "}
+              agents
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || isLoading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalFilteredPages }, (_, i) => i + 1).map(
+                (page) => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(page)}
+                    disabled={isLoading}
+                    className="w-8 h-8 p-0"
+                  >
+                    {page}
+                  </Button>
+                )
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalFilteredPages || isLoading}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Order Report Sheet */}
