@@ -63,6 +63,13 @@ interface Service {
     categoryId: string;
     createdAt: string;
     updatedAt: string;
+    pricingVariations?: {
+      itemType: string;
+      customerCategory: "MALE" | "FEMALE";
+      price: number;
+      description: string;
+      isActive: boolean;
+    }[];
   }[];
 }
 
@@ -194,33 +201,49 @@ export default function SettingsPage() {
     fetchCategories();
   }, []);
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = async (file: File, isSubcategory: boolean = false) => {
     setIsUploadingImage(true);
     try {
       const imageUrl = await uploadImageToCloudinary(file);
-      setNewCategory((prev) => ({
-        ...prev,
-        imageUrl,
-      }));
+      console.log('Uploaded image URL:', imageUrl);
+      if (isSubcategory) {
+        setNewSubcategory((prev) => ({
+          ...prev,
+          imageUrl,
+        }));
+      } else {
+        setNewCategory((prev) => ({
+          ...prev,
+          imageUrl,
+        }));
+      }
       toast.success("Image uploaded successfully");
     } catch (error) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
-      setNewCategory((prev) => ({
-        ...prev,
-        imageUrl: null,
-      }));
+      if (isSubcategory) {
+        setNewSubcategory((prev) => ({
+          ...prev,
+          imageUrl: null,
+        }));
+      } else {
+        setNewCategory((prev) => ({
+          ...prev,
+          imageUrl: null,
+        }));
+      }
     } finally {
       setIsUploadingImage(false);
     }
   };
+  console.log(selectedCategory);
 
   const handleAddCategory = async () => {
     if (newCategory.name.trim()) {
       setIsLoading(true);
       try {
         const response = await api.post(
-          "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/categories",
+          `/admin/services/${selectedCategory}`,
           newCategory
         );
 
@@ -228,6 +251,7 @@ export default function SettingsPage() {
           toast.success("Category added successfully");
           await fetchCategories();
           setNewCategory({
+            
             name: "",
             description: "",
             showOnHome: true,
@@ -285,15 +309,20 @@ export default function SettingsPage() {
       setIsLoading(true);
       try {
         const response = await api.post(
-          "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/services",
+          `/admin/services/${selectedCategory}`,
           {
-            ...newSubcategory,
-            categoryId: selectedCategory,
+            name: newSubcategory.name,
+            description: newSubcategory.description,
+            basePrice: newSubcategory.basePrice,
+            imageUrl: newSubcategory.imageUrl,
+            isActive: newSubcategory.isActive,
+            showOnHome: newSubcategory.showOnHome,
+            pricingVariations: newSubcategory.pricingVariations,
           }
         );
 
         if (response.data.success) {
-          toast.success("Subcategory added successfully");
+          toast.success("Service added successfully");
           await fetchCategories();
           setNewSubcategory({
             name: "",
@@ -308,8 +337,8 @@ export default function SettingsPage() {
           setIsAddingSubcategory(false);
         }
       } catch (error) {
-        console.error("Error adding subcategory:", error);
-        toast.error("Failed to add subcategory");
+        console.error("Error adding service:", error);
+        toast.error("Failed to add service");
       } finally {
         setIsLoading(false);
       }
@@ -756,7 +785,7 @@ export default function SettingsPage() {
                                         onChange={(e) => {
                                           const file = e.target.files?.[0];
                                           if (file) {
-                                            handleImageUpload(file);
+                                            handleImageUpload(file, true);
                                           }
                                         }}
                                         disabled={isUploadingImage}
@@ -1003,6 +1032,71 @@ export default function SettingsPage() {
                                       <p className="text-sm text-gray-500">
                                         {subService.description}
                                       </p>
+                                      {subService.pricingVariations && subService.pricingVariations.length > 0 && (
+                                        <div className="mt-4">
+                                          <div className="flex items-center justify-between mb-3">
+                                            <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                              <Shirt className="h-4 w-4 text-[#9D215D]" />
+                                              Pricing Variations
+                                            </h5>
+                                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                                              {subService.pricingVariations.length} variations
+                                            </span>
+                                          </div>
+                                          <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+                                            <table className="w-full text-sm">
+                                              <thead className="bg-gray-50/80 backdrop-blur-sm">
+                                                <tr>
+                                                  <th className="px-4 py-3 text-left font-medium text-gray-700">Item Type</th>
+                                                  <th className="px-4 py-3 text-left font-medium text-gray-700">Category</th>
+                                                  <th className="px-4 py-3 text-left font-medium text-gray-700">Price</th>
+                                                  <th className="px-4 py-3 text-left font-medium text-gray-700">Description</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-gray-100">
+                                                {subService.pricingVariations.map((variation, idx) => (
+                                                  <tr 
+                                                    key={idx} 
+                                                    className="group hover:bg-gray-50/50 transition-colors duration-150"
+                                                  >
+                                                    <td className="px-4 py-3">
+                                                      <div className="flex items-center gap-2">
+                                                        <div className="h-2 w-2 rounded-full bg-[#9D215D]" />
+                                                        <span className="text-gray-700">{variation.itemType}</span>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        variation.customerCategory === 'MALE' 
+                                                          ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' 
+                                                          : 'bg-pink-50 text-pink-700 ring-1 ring-pink-200'
+                                                      }`}>
+                                                        {variation.customerCategory}
+                                                      </span>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                      <div className="flex items-center gap-1">
+                                                        <span className="font-medium text-[#9D215D]">₹{variation.price}</span>
+                                                        <span className="text-xs text-gray-400">/item</span>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                      <div className="flex items-center gap-2">
+                                                        <span className="text-gray-600">{variation.description}</span>
+                                                        {variation.isActive ? (
+                                                          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                                        ) : (
+                                                          <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                                                        )}
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-4">
