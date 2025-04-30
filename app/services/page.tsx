@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,355 +11,1007 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Shirt, Loader2, X, AlertTriangle, Eye } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Service, initialServices, categories } from "./types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { toast } from "sonner";
+import api from "@/lib/axios";
+import { uploadImageToCloudinary } from "@/lib/cloudinaryImageUpload";
+
+interface CategoryResponse {
+  name: string;
+  description: string;
+  id: string;
+  showOnHome: boolean;
+  sortOrder: number;
+  imageUrl: string | null;
+  services?: {
+    id: string;
+    name: string;
+    description: string;
+    basePrice: number;
+    imageUrl: string | null;
+    isActive: boolean;
+    showOnHome: boolean;
+    sortOrder: number;
+    categoryId: string;
+    createdAt: string;
+    updatedAt: string;
+    pricingVariations?: {
+      itemType: string;
+      customerCategory: "MALE" | "FEMALE";
+      price: number;
+      description: string;
+      isActive: boolean;
+    }[];
+  }[];
+}
+
+interface NewCategory {
+  name: string;
+  description: string;
+  showOnHome: boolean;
+  imageUrl: string | null;
+  sortOrder: number;
+}
+
+interface NewSubcategory {
+  name: string;
+  description: string;
+  categoryId: string;
+  basePrice: number;
+  imageUrl: string | null;
+  isActive: boolean;
+  showOnHome: boolean;
+  pricingVariations: {
+    itemType: string;
+    customerCategory: "MALE" | "FEMALE";
+    price: number;
+    description: string;
+    isActive: boolean;
+  }[];
+}
+
+interface PricingVariation {
+  itemType: string;
+  customerCategory: "MALE" | "FEMALE";
+  price: number;
+  description: string;
+  isActive: boolean;
+}
 
 export default function ServicesPage() {
-  const [services, setServices] = useState<Service[]>(initialServices);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [formData, setFormData] = useState<Partial<Service>>({});
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [newCategory, setNewCategory] = useState<NewCategory>({
+    name: "",
+    description: "",
+    showOnHome: true,
+    imageUrl: null,
+    sortOrder: 0,
+  });
+  const [newSubcategory, setNewSubcategory] = useState<NewSubcategory>({
+    name: "",
+    description: "",
+    categoryId: "",
+    basePrice: 0,
+    imageUrl: null,
+    isActive: true,
+    showOnHome: false,
+    pricingVariations: [],
+  });
+  const [newPricingVariation, setNewPricingVariation] = useState<PricingVariation>({
+    itemType: "",
+    customerCategory: "MALE",
+    price: 0,
+    description: "",
+    isActive: true,
+  });
+  const [selectedCategory, setSelectedCategory] = useState<CategoryResponse | null>(null);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isAddingSubcategory, setIsAddingSubcategory] = useState(false);
+  const [isViewingCategory, setIsViewingCategory] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    category?: CategoryResponse;
+  }>({
+    isOpen: false,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Filtering
-  const filteredServices = services.filter(
-    (service) =>
-      (selectedCategory === "All" || service.category === selectedCategory) &&
-      (service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  // Handlers
-  const openAddModal = () => {
-    setModalMode("add");
-    setFormData({
-      name: "",
-      category: categories[0],
-      price: 0,
-      estimatedTime: "",
-      duration: "",
-      status: "Active",
-      description: "",
-    });
-    setModalOpen(true);
-  };
-
-  const openEditModal = (service: Service) => {
-    setModalMode("edit");
-    setSelectedServiceId(service.id);
-    setFormData({ ...service });
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedServiceId(null);
-    setFormData({});
-  };
-
-  const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = () => {
-    if (
-      !formData.name ||
-      !formData.category ||
-      formData.price === undefined ||
-      !formData.estimatedTime ||
-      !formData.status ||
-      !formData.description
-    ) {
-      return;
-    }
-    if (modalMode === "add") {
-      const newService: Service = {
-        id: `S${(services.length + 1).toString().padStart(3, "0")}`,
-        number: (services.length + 1).toString().padStart(3, "0"),
-        name: formData.name,
-        category: formData.category,
-        price: Number(formData.price),
-        estimatedTime: formData.estimatedTime,
-        duration: formData.duration || formData.estimatedTime,
-        status: formData.status as "Active" | "Inactive",
-        description: formData.description,
-        image: null,
-        orders: 0,
-        priceVariations: [],
-      };
-      setServices((prev) => [...prev, newService]);
-    } else if (modalMode === "edit" && selectedServiceId) {
-      setServices((prev) =>
-        prev.map((s) =>
-          s.id === selectedServiceId
-            ? {
-                ...s,
-                ...formData,
-                price: Number(formData.price),
-                status: formData.status as "Active" | "Inactive",
-              }
-            : s
-        )
+  const fetchCategories = async () => {
+    setIsLoadingCategories(true);
+    try {
+      const response = await api.get(
+        "https://civilian-mole-parivartanx-812f67f6.koyeb.app/api/v1/admin/categories"
       );
+      if (response.data.success) {
+        setCategories(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast.error("Failed to fetch categories");
+    } finally {
+      setIsLoadingCategories(false);
     }
-    closeModal();
   };
 
-  const openDeleteDialog = (id: string) => {
-    setDeleteServiceId(id);
-    setShowDeleteDialog(true);
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const handleImageUpload = async (file: File, isSubcategory: boolean = false) => {
+    setIsUploadingImage(true);
+    try {
+      const imageUrl = await uploadImageToCloudinary(file);
+      if (isSubcategory) {
+        setNewSubcategory((prev) => ({
+          ...prev,
+          imageUrl,
+        }));
+      } else {
+        setNewCategory((prev) => ({
+          ...prev,
+          imageUrl,
+        }));
+      }
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+      if (isSubcategory) {
+        setNewSubcategory((prev) => ({
+          ...prev,
+          imageUrl: null,
+        }));
+      } else {
+        setNewCategory((prev) => ({
+          ...prev,
+          imageUrl: null,
+        }));
+      }
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
-  const handleDelete = () => {
-    if (deleteServiceId) {
-      setServices((prev) => prev.filter((s) => s.id !== deleteServiceId));
-      setShowDeleteDialog(false);
-      setDeleteServiceId(null);
+  const handleAddCategory = async () => {
+    if (newCategory.name.trim()) {
+      setIsLoading(true);
+      try {
+        const response = await api.post(
+          "/admin/categories",
+          newCategory
+        );
+
+        if (response.data.success) {
+          toast.success("Category added successfully");
+          await fetchCategories();
+          setNewCategory({
+            name: "",
+            description: "",
+            showOnHome: true,
+            imageUrl: null,
+            sortOrder: 0,
+          });
+          setIsAddingCategory(false);
+        }
+      } catch (error) {
+        console.error("Error adding category:", error);
+        toast.error("Failed to add category");
+      } finally {
+        setIsLoading(false);
+      }
     }
+  };
+  console.log(selectedCategory);
+
+  const handleAddSubcategory = async () => {
+    if (newSubcategory.name.trim() && newSubcategory.categoryId.trim()) {
+      setIsLoading(true);
+      try {
+        const response = await api.post(
+          `/admin/services/${selectedCategory?.id}`,
+          newSubcategory
+        );
+
+        if (response.data.success) {
+          toast.success("Service added successfully");
+          await fetchCategories();
+          setIsAddingSubcategory(false);
+          setNewSubcategory({
+            name: "",
+            description: "",
+            categoryId: "",
+            basePrice: 0,
+            imageUrl: null,
+            isActive: true,
+            showOnHome: false,
+            pricingVariations: [],
+          });
+        }
+      } catch (error) {
+        console.error("Error adding service:", error);
+        toast.error("Failed to add service");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleAddPricingVariation = () => {
+    if (newPricingVariation.itemType.trim() && newPricingVariation.price > 0) {
+      setNewSubcategory((prev) => ({
+        ...prev,
+        pricingVariations: [
+          ...prev.pricingVariations,
+          newPricingVariation,
+        ],
+      }));
+      setNewPricingVariation({
+        itemType: "",
+        customerCategory: "MALE",
+        price: 0,
+        description: "",
+        isActive: true,
+      });
+    }
+  };
+
+  const handleRemovePricingVariation = (index: number) => {
+    setNewSubcategory((prev) => ({
+      ...prev,
+      pricingVariations: prev.pricingVariations.filter((_, i) => i !== index),
+    }));
+  };
+
+  // const handleEditCategory = async () => {
+  //   if (selectedCategory && newCategory.name.trim()) {
+  //     setIsLoading(true);
+  //     try {
+  //       const response = await api.put(
+  //         `/admin/categories/${selectedCategory.id}`,
+  //         newCategory
+  //       );
+
+  //       if (response.data.success) {
+  //         toast.success("Category updated successfully");
+  //         await fetchCategories();
+  //         setNewCategory({
+  //           name: "",
+  //           description: "",
+  //           showOnHome: true,
+  //           imageUrl: null,
+  //           sortOrder: 0,
+  //         });
+  //         setSelectedCategory(null);
+  //         setIsAddingCategory(false);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error updating category:", error);
+  //       toast.error("Failed to update category");
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   }
+  // };
+
+  const handleDeleteCategory = async () => {
+    if (deleteDialog.category) {
+      setIsLoading(true);
+      try {
+        const response = await api.delete(
+          `/admin/categories/${deleteDialog.category.id}`
+        );
+
+        if (response.data.success) {
+          toast.success("Category deleted successfully");
+          await fetchCategories();
+          setDeleteDialog({ isOpen: false });
+        }
+      } catch (error) {
+        console.error("Error deleting category:", error);
+        toast.error("Failed to delete category");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const openEditModal = (category: CategoryResponse) => {
+    setSelectedCategory(category);
+    setNewCategory({
+      name: category.name,
+      description: category.description,
+      showOnHome: category.showOnHome,
+      imageUrl: category.imageUrl,
+      sortOrder: category.sortOrder,
+    });
+    setIsAddingCategory(true);
+  };
+
+  const openViewSidebar = (category: CategoryResponse) => {
+    setSelectedCategory(category);
+    setIsViewingCategory(true);
   };
 
   return (
-    <div className="container p-6 max-w-full">
+    <div className="container p-6 max-w-full overflow-y-scroll max-h-[90vh]">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Services</h1>
             <p className="text-gray-500">Manage your laundry services</p>
           </div>
-          <Button onClick={openAddModal} className="bg-black text-white">
-            <Plus className="h-4 w-4 mr-2" /> Add Service
-          </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={selectedCategory === "All" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("All")}
-            className={`rounded-full ${
-              selectedCategory === "All"
-                ? "bg-rose-600 hover:bg-rose-700"
-                : "hover:bg-rose-50 hover:text-rose-600"
-            }`}
-          >
-            All
-          </Button>
-          {categories.map((category) => (
-            <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
-              onClick={() => setSelectedCategory(category)}
-              className={`rounded-full ${
-                selectedCategory === category
-                  ? "bg-rose-700 hover:bg-rose-700"
-                  : "hover:bg-rose-50 hover:text-rose-600"
-              }`}
-            >
-              {category}
+          <div className="flex gap-2">
+            <Button onClick={() => setIsAddingCategory(true)} className="bg-black text-white">
+              <Plus className="h-4 w-4 mr-2" /> Add Category
             </Button>
-          ))}
-          <div className="flex-1">
-            <Input
-              placeholder="Search services..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-md"
-            />
+            <Button onClick={() => setIsAddingSubcategory(true)} className="bg-[#9D215D] hover:bg-[#CD3883]">
+              <Plus className="h-4 w-4 mr-2" /> Add Service
+            </Button>
           </div>
         </div>
-        {/* Table Layout */}
-        <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="px-2 py-2 text-left">SERVICE ID</th>
-                <th className="px-2 py-2 text-left">CATEGORY</th>
-                <th className="px-2 py-2 text-left">PRICE (₹)</th>
-                <th className="px-2 py-2 text-left">ESTIMATED TIME</th>
-                <th className="px-2 py-2 text-left">STATUS</th>
-                <th className="px-2 py-2 text-left">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredServices.map((service) => (
-                <tr key={service.id} className="border-b hover:bg-gray-50">
-                  <td className="px-2 py-2">{service.id}</td>
-                  <td className="px-2 py-2">{service.category}</td>
-                  <td className="px-2 py-2">₹{service.price}</td>
-                  <td className="px-2 py-2">{service.estimatedTime}</td>
-                  <td className="px-2 py-2">
-                    <span className={
-                      service.status === "Active"
-                        ? "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs"
-                        : "bg-rose-100 text-rose-800 px-2 py-1 rounded-full text-xs"
-                    }>
-                      {service.status}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 flex gap-2">
-                    <button
-                      className="text-rose-600 hover:text-rose-700"
-                      onClick={() => openEditModal(service)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      className="text-rose-600 hover:text-rose-700"
-                      onClick={() => openDeleteDialog(service.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredServices.length === 0 && (
+
+        {isLoadingCategories ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-400">
-                    No services found.
-                  </td>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Category
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {categories.map((category) => (
+                  <tr key={category.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {category.imageUrl ? (
+                          <img
+                            src={category.imageUrl}
+                            alt={category.name}
+                            className="h-10 w-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-[#9D215D]/10 flex items-center justify-center">
+                            <Shirt className="h-5 w-5 text-[#9D215D]" />
+                          </div>
+                        )}
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{category.name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-500 truncate max-w-xs">
+                        {category.description}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        category.showOnHome
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}>
+                        {category.showOnHome ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCategory(category);
+                            setNewSubcategory(prev => ({
+                              ...prev,
+                              categoryId: category.id
+                            }));
+                            setIsAddingSubcategory(true);
+                          }}
+                          className="text-[#9D215D] hover:text-[#CD3883]"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openViewSidebar(category)}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal(category)}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteDialog({ isOpen: true, category })}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Add/Edit Modal */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto py-8">
+      {/* Add Category Modal */}
+      <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{modalMode === "add" ? "Add Service" : "Edit Service"}</DialogTitle>
+            <DialogTitle>Add New Category</DialogTitle>
             <DialogDescription>
-              {modalMode === "add"
-                ? "Fill in the service details below."
-                : "Update the service details below."}
+              Fill in the category details below.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Service Name</Label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="categoryName">Name</Label>
               <Input
-                id="name"
-                name="name"
-                value={formData.name || ""}
-                onChange={handleFormChange}
+                id="categoryName"
+                placeholder="Enter category name"
+                value={newCategory.name}
+                onChange={(e) =>
+                  setNewCategory((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
                 required
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="category">Category</Label>
-              <select
-                id="category"
-                name="category"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={formData.category || categories[0]}
-                onChange={handleFormChange}
-                required
-              >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="price">Price (₹)</Label>
-              <Input
-                id="price"
-                name="price"
-                type="number"
-                min="0"
-                value={formData.price || ""}
-                onChange={handleFormChange}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="estimatedTime">Estimated Time</Label>
-              <Input
-                id="estimatedTime"
-                name="estimatedTime"
-                value={formData.estimatedTime || ""}
-                onChange={handleFormChange}
-                required
-                placeholder="e.g., 2 hours"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="duration">Duration</Label>
-              <Input
-                id="duration"
-                name="duration"
-                value={formData.duration || ""}
-                onChange={handleFormChange}
-                required
-                placeholder="e.g., 24 hours"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                name="status"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={formData.status || "Active"}
-                onChange={handleFormChange}
-                required
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
+            <div className="space-y-2">
+              <Label htmlFor="categoryDescription">Description</Label>
               <Textarea
-                id="description"
-                name="description"
-                value={formData.description || ""}
-                onChange={handleFormChange}
+                id="categoryDescription"
+                placeholder="Enter category description"
+                value={newCategory.description}
+                onChange={(e) =>
+                  setNewCategory((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 required
-                className="min-h-[100px]"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="categoryImage">Upload Image (Optional)</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  id="categoryImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleImageUpload(file);
+                    }
+                  }}
+                  disabled={isUploadingImage}
+                />
+                {isUploadingImage && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                {newCategory.imageUrl && (
+                  <img
+                    src={newCategory.imageUrl}
+                    alt="Preview"
+                    className="h-10 w-10 object-cover rounded"
+                  />
+                )}
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={newCategory.showOnHome}
+                onChange={(e) =>
+                  setNewCategory((prev) => ({
+                    ...prev,
+                    showOnHome: e.target.checked,
+                  }))
+                }
+                id="showOnHome"
+              />
+              <Label htmlFor="showOnHome">Show on home</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeModal} type="button">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddingCategory(false);
+                setNewCategory({
+                  name: "",
+                  description: "",
+                  showOnHome: true,
+                  imageUrl: null,
+                  sortOrder: 0,
+                });
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave} className="bg-rose-600 hover:bg-rose-700 text-white" type="button">
-              {modalMode === "add" ? "Add Service" : "Save Changes"}
+            <Button
+              onClick={handleAddCategory}
+              disabled={
+                isLoading ||
+                !newCategory.name.trim() ||
+                !newCategory.description.trim()
+              }
+              className="bg-[#9D215D] hover:bg-[#CD3883]"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto py-8">
+      {/* Add Service Modal */}
+      <Dialog open={isAddingSubcategory} onOpenChange={setIsAddingSubcategory}>
+        <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Delete Service</DialogTitle>
+            <DialogTitle>Add New Service</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this service? This action cannot be undone.
+              Add a new service to {selectedCategory?.name || 'selected category'}
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Service Name</Label>
+                <Input
+                  value={newSubcategory.name}
+                  onChange={(e) =>
+                    setNewSubcategory((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter service name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Base Price</Label>
+                <Input
+                  type="number"
+                  value={newSubcategory.basePrice}
+                  onChange={(e) =>
+                    setNewSubcategory((prev) => ({
+                      ...prev,
+                      basePrice: Number(e.target.value),
+                    }))
+                  }
+                  placeholder="Enter base price"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newSubcategory.description}
+                onChange={(e) =>
+                  setNewSubcategory((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Enter description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Upload Image (Optional)</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleImageUpload(file, true);
+                    }
+                  }}
+                  disabled={isUploadingImage}
+                />
+                {isUploadingImage && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                {newSubcategory.imageUrl && (
+                  <img
+                    src={newSubcategory.imageUrl}
+                    alt="Preview"
+                    className="h-10 w-10 object-cover rounded"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Pricing Variations</Label>
+              </div>
+
+              <div className="p-4 border rounded-lg space-y-4">
+                <h4 className="font-medium">New Pricing Variation</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Item Type</Label>
+                    <Input
+                      value={newPricingVariation.itemType}
+                      onChange={(e) =>
+                        setNewPricingVariation((prev) => ({
+                          ...prev,
+                          itemType: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter item type"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Customer Category</Label>
+                    <select
+                      value={newPricingVariation.customerCategory}
+                      onChange={(e) =>
+                        setNewPricingVariation((prev) => ({
+                          ...prev,
+                          customerCategory: e.target.value as "MALE" | "FEMALE",
+                        }))
+                      }
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                    >
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Price</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={newPricingVariation.price || ""}
+                      onChange={(e) =>
+                        setNewPricingVariation((prev) => ({
+                          ...prev,
+                          price: Number(e.target.value) || 0,
+                        }))
+                      }
+                      placeholder="Enter price"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Input
+                      value={newPricingVariation.description}
+                      onChange={(e) =>
+                        setNewPricingVariation((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter description"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleAddPricingVariation}
+                    className="bg-[#9D215D] hover:bg-[#CD3883]"
+                  >
+                    Add This Variation
+                  </Button>
+                </div>
+              </div>
+
+              {newSubcategory.pricingVariations.map((variation, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium">Variation {index + 1}</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemovePricingVariation(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Item Type</Label>
+                      <Input
+                        value={variation.itemType}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Customer Category</Label>
+                      <Input
+                        value={variation.customerCategory}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Price</Label>
+                      <Input
+                        type="number"
+                        value={variation.price}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Input
+                        value={variation.description}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddingSubcategory(false);
+                setNewSubcategory({
+                  name: "",
+                  description: "",
+                  categoryId: "",
+                  basePrice: 0,
+                  imageUrl: null,
+                  isActive: true,
+                  showOnHome: false,
+                  pricingVariations: [],
+                });
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleDelete} className="bg-red-600 text-white">
-              Delete
+            <Button
+              onClick={handleAddSubcategory}
+              disabled={
+                isLoading ||
+                !newSubcategory.name.trim() ||
+                newSubcategory.pricingVariations.length === 0
+              }
+              className="bg-[#9D215D] hover:bg-[#CD3883]"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Service"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Category Sidebar */}
+      <Sheet open={isViewingCategory} onOpenChange={setIsViewingCategory}>
+        <SheetContent className="w-[800px] sm:max-w-[800px] overflow-y-auto">
+          <div className=" top-0 bg-white z-10 border-b pb-4">
+            <SheetHeader>
+              <SheetTitle>Category Details</SheetTitle>
+              <SheetDescription>
+                View all details about the selected category
+              </SheetDescription>
+            </SheetHeader>
+          </div>
+          {selectedCategory && (
+            <div className="mt-6 space-y-6 pb-6">
+              <div className="flex items-center gap-4">
+                {selectedCategory.imageUrl ? (
+                  <img
+                    src={selectedCategory.imageUrl}
+                    alt={selectedCategory.name}
+                    className="h-20 w-20 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="h-20 w-20 rounded-lg bg-[#9D215D]/10 flex items-center justify-center">
+                    <Shirt className="h-10 w-10 text-[#9D215D]" />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedCategory.name}</h3>
+                  <p className="text-sm text-gray-500">{selectedCategory.description}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                  <p className="mt-1">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      selectedCategory.showOnHome
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}>
+                      {selectedCategory.showOnHome ? "Active" : "Inactive"}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500">Services</h4>
+                  <div className="mt-2 space-y-4">
+                    {selectedCategory.services?.map((service) => (
+                      <div key={service.id} className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            {service.imageUrl ? (
+                              <img
+                                src={service.imageUrl}
+                                alt={service.name}
+                                className="h-10 w-10 rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-md bg-[#9D215D]/10 flex items-center justify-center">
+                                <Shirt className="h-5 w-5 text-[#9D215D]" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium">{service.name}</p>
+                              <p className="text-sm text-gray-500">₹{service.basePrice}</p>
+                            </div>
+                          </div>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            service.isActive
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}>
+                            {service.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                        
+                        {/* Pricing Variations */}
+                        {service.pricingVariations && service.pricingVariations.length > 0 && (
+                          <div className="ml-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-sm font-medium text-gray-700">Pricing Variations</h5>
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                                {service.pricingVariations.length} variations
+                              </span>
+                            </div>
+                            <div className="overflow-hidden rounded-lg border border-gray-200">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Item Type</th>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Category</th>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Price</th>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {service.pricingVariations.map((variation, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50">
+                                      <td className="px-4 py-2">
+                                        <div className="flex items-center gap-2">
+                                          <div className="h-2 w-2 rounded-full bg-[#9D215D]" />
+                                          <span className="text-gray-700">{variation.itemType}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                          variation.customerCategory === 'MALE' 
+                                            ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' 
+                                            : 'bg-pink-50 text-pink-700 ring-1 ring-pink-200'
+                                        }`}>
+                                          {variation.customerCategory}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium text-[#9D215D]">₹{variation.price}</span>
+                                          <span className="text-xs text-gray-400">/item</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                          variation.isActive
+                                            ? 'bg-green-50 text-green-700 ring-1 ring-green-200'
+                                            : 'bg-gray-50 text-gray-700 ring-1 ring-gray-200'
+                                        }`}>
+                                          {variation.isActive ? 'Active' : 'Inactive'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {(!selectedCategory.services || selectedCategory.services.length === 0) && (
+                      <p className="text-sm text-gray-500">No services added yet</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.isOpen} onOpenChange={() => setDeleteDialog({ isOpen: false })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Are you sure you want to delete the category `&apos;`{deleteDialog.category?.name}`&apos;`? This will also delete all its services.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCategory}
+              className="bg-red-600 hover:bg-red-700 cursor-pointer"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
