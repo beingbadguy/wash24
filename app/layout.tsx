@@ -13,6 +13,7 @@ import { Separator } from "@radix-ui/react-separator";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/store";
 import { useEffect, useState } from "react";
+import { Toaster } from "sonner";
 
 const Skeleton = ({
   className,
@@ -122,6 +123,7 @@ export default function RootLayout({
             </div>
           </div>
         )}
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );
