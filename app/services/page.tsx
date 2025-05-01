@@ -24,10 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import api from "@/lib/axios";
 import { uploadImageToCloudinary } from "@/lib/cloudinaryImageUpload";
+import { useRouter } from "next/navigation";
 
 interface CategoryResponse {
   name: string;
@@ -91,6 +92,11 @@ interface PricingVariation {
   isActive: boolean;
 }
 
+// Add this type alias for clarity
+// Type for a single service/subcategory
+// (This matches the type of objects in CategoryResponse['services'])
+type SubService = NonNullable<CategoryResponse['services']>[number];
+
 export default function ServicesPage() {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [newCategory, setNewCategory] = useState<NewCategory>({
@@ -101,7 +107,7 @@ export default function ServicesPage() {
     sortOrder: 0,
   });
   const [newSubcategory, setNewSubcategory] = useState<NewSubcategory>({
-    name: "",
+      name: "",
     description: "",
     categoryId: "",
     basePrice: 0,
@@ -113,8 +119,8 @@ export default function ServicesPage() {
   const [newPricingVariation, setNewPricingVariation] = useState<PricingVariation>({
     itemType: "",
     customerCategory: "MALE",
-    price: 0,
-    description: "",
+      price: 0,
+      description: "",
     isActive: true,
   });
   const [selectedCategory, setSelectedCategory] = useState<CategoryResponse | null>(null);
@@ -130,6 +136,14 @@ export default function ServicesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState<SubService | null>(null);
+  const [showDeleteServiceDialog, setShowDeleteServiceDialog] = useState(false);
+  const [isDeletingService, setIsDeletingService] = useState(false);
+  const [servicePage, setServicePage] = useState(1);
+  const SERVICES_PER_PAGE = 6;
+  const [categoryPage, setCategoryPage] = useState(1);
+  const CATEGORIES_PER_PAGE = 6;
+  const router = useRouter();
 
   const fetchCategories = async () => {
     setIsLoadingCategories(true);
@@ -330,22 +344,39 @@ export default function ServicesPage() {
     }
   };
 
-  const openEditModal = (category: CategoryResponse) => {
-    setSelectedCategory(category);
-    setNewCategory({
-      name: category.name,
-      description: category.description,
-      showOnHome: category.showOnHome,
-      imageUrl: category.imageUrl,
-      sortOrder: category.sortOrder,
-    });
-    setIsAddingCategory(true);
-  };
+  // const openEditModal = (category: CategoryResponse) => {
+  //   setSelectedCategory(category);
+  //   setNewCategory({
+  //     name: category.name,
+  //     description: category.description,
+  //     showOnHome: category.showOnHome,
+  //     imageUrl: category.imageUrl,
+  //     sortOrder: category.sortOrder,
+  //   });
+  //   setIsAddingCategory(true);
+  // };
 
   const openViewSidebar = (category: CategoryResponse) => {
     setSelectedCategory(category);
+    setServicePage(1);
     setIsViewingCategory(true);
   };
+
+  const paginatedServices = selectedCategory?.services
+    ? selectedCategory.services.slice(
+        (servicePage - 1) * SERVICES_PER_PAGE,
+        servicePage * SERVICES_PER_PAGE
+      )
+    : [];
+  const totalPages = selectedCategory?.services
+    ? Math.ceil(selectedCategory.services.length / SERVICES_PER_PAGE)
+    : 1;
+
+  const paginatedCategories = categories.slice(
+    (categoryPage - 1) * CATEGORIES_PER_PAGE,
+    categoryPage * CATEGORIES_PER_PAGE
+  );
+  const totalCategoryPages = Math.ceil(categories.length / CATEGORIES_PER_PAGE);
 
   return (
     <div className="container p-6 max-w-full overflow-y-scroll max-h-[90vh]">
@@ -359,9 +390,7 @@ export default function ServicesPage() {
             <Button onClick={() => setIsAddingCategory(true)} className="bg-black text-white">
               <Plus className="h-4 w-4 mr-2" /> Add Category
             </Button>
-            <Button onClick={() => setIsAddingSubcategory(true)} className="bg-[#9D215D] hover:bg-[#CD3883]">
-              <Plus className="h-4 w-4 mr-2" /> Add Service
-            </Button>
+           
           </div>
         </div>
 
@@ -386,10 +415,10 @@ export default function ServicesPage() {
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
-                </tr>
-              </thead>
+              </tr>
+            </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {categories.map((category) => (
+                {paginatedCategories.map((category) => (
                   <tr key={category.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -421,8 +450,8 @@ export default function ServicesPage() {
                           : "bg-gray-100 text-gray-800"
                       }`}>
                         {category.showOnHome ? "Active" : "Inactive"}
-                      </span>
-                    </td>
+                    </span>
+                  </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -451,8 +480,8 @@ export default function ServicesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => openEditModal(category)}
-                          className="text-gray-600 hover:text-gray-900"
+                          onClick={() => router.push(`/services/${category.id}/edit`)}
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -461,16 +490,16 @@ export default function ServicesPage() {
                           size="sm"
                           onClick={() => setDeleteDialog({ isOpen: true, category })}
                           className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                    >
+                      <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         )}
       </div>
 
@@ -517,7 +546,7 @@ export default function ServicesPage() {
             <div className="space-y-2">
               <Label htmlFor="categoryImage">Upload Image (Optional)</Label>
               <div className="flex items-center gap-4">
-                <Input
+              <Input
                   id="categoryImage"
                   type="file"
                   accept="image/*"
@@ -539,7 +568,7 @@ export default function ServicesPage() {
                     className="h-10 w-10 object-cover rounded"
                   />
                 )}
-              </div>
+            </div>
             </div>
             <div className="flex items-center space-x-2">
               <input
@@ -848,9 +877,9 @@ export default function ServicesPage() {
           <div className=" top-0 bg-white z-10 border-b pb-4">
             <SheetHeader>
               <SheetTitle>Category Details</SheetTitle>
-              <SheetDescription>
+              {/* <SheetDescription>
                 View all details about the selected category
-              </SheetDescription>
+              </SheetDescription> */}
             </SheetHeader>
           </div>
           {selectedCategory && (
@@ -888,10 +917,10 @@ export default function ServicesPage() {
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">Services</h4>
                   <div className="mt-2 space-y-4">
-                    {selectedCategory.services?.map((service) => (
+                    {paginatedServices.map((service) => (
                       <div key={service.id} className="space-y-3">
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             {service.imageUrl ? (
                               <img
                                 src={service.imageUrl}
@@ -903,18 +932,35 @@ export default function ServicesPage() {
                                 <Shirt className="h-5 w-5 text-[#9D215D]" />
                               </div>
                             )}
-                            <div>
-                              <p className="font-medium">{service.name}</p>
-                              <p className="text-sm text-gray-500">₹{service.basePrice}</p>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{service.name}</p>
+                              <div className="text-sm text-gray-500 truncate">{service.description}</div>
+                              <div className="text-xs text-gray-500 mt-1">Base Price: <span className="font-medium text-[#9D215D]">₹{service.basePrice}</span></div>
                             </div>
                           </div>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            service.isActive
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {service.isActive ? "Active" : "Inactive"}
-                          </span>
+                          <div className="flex gap-2 items-center ml-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => router.push(`/services/${selectedCategory?.id}/services/${service.id}/edit`)}
+                              className="text-blue-600 hover:text-blue-900 transition-colors"
+                              aria-label="Edit Service"
+                            >
+                              <Pencil className="h-5 w-5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setServiceToDelete(service);
+                                setShowDeleteServiceDialog(true);
+                              }}
+                              className="text-red-600 hover:text-red-900 transition-colors"
+                              aria-label="Delete Service"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </Button>
+                          </div>
                         </div>
                         
                         {/* Pricing Variations */}
@@ -984,6 +1030,29 @@ export default function ServicesPage() {
                   </div>
                 </div>
               </div>
+              {totalPages > 1 && (
+                <div className="flex justify-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={servicePage === 1}
+                    onClick={() => setServicePage(servicePage - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <span className="px-2 py-1 text-sm">
+                    Page {servicePage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={servicePage === totalPages}
+                    onClick={() => setServicePage(servicePage + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </SheetContent>
@@ -998,7 +1067,7 @@ export default function ServicesPage() {
               <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
             </div>
             <AlertDialogDescription>
-              Are you sure you want to delete the category `&apos;`{deleteDialog.category?.name}`&apos;`? This will also delete all its services.
+              Are you sure you want to delete the category {deleteDialog.category?.name}? This will also delete all its services.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1012,6 +1081,101 @@ export default function ServicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete Service Confirmation Dialog */}
+      <AlertDialog open={showDeleteServiceDialog} onOpenChange={setShowDeleteServiceDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Are you sure you want to delete the service {serviceToDelete?.name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer" disabled={isDeletingService}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (serviceToDelete) {
+                  setIsDeletingService(true);
+                  try {
+                    await api.delete(`/admin/services/${serviceToDelete.id}`);
+                    setShowDeleteServiceDialog(false);
+                    setServiceToDelete(null);
+                    setIsViewingCategory(false);
+                    fetchCategories();
+                    toast.success("Service deleted successfully");
+                  } catch (error) {
+                    toast.error("Failed to delete service");
+                    console.error(error);
+                  } finally {
+                    setIsDeletingService(false);
+                  }
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 cursor-pointer"
+              disabled={isDeletingService}
+            >
+              {isDeletingService ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Pagination for categories */}
+      {totalCategoryPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-gray-500 text-sm">
+            Showing {(categoryPage - 1) * CATEGORIES_PER_PAGE + 1}
+            {" "}
+            to {Math.min(categoryPage * CATEGORIES_PER_PAGE, categories.length)}
+            {" "}
+            of {categories.length} categories
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={categoryPage === 1}
+              onClick={() => setCategoryPage(categoryPage - 1)}
+              className="rounded-md"
+            >
+              Previous
+            </Button>
+            {Array.from({ length: totalCategoryPages }, (_, i) => (
+              <Button
+                key={i + 1}
+                size="sm"
+                variant={categoryPage === i + 1 ? "default" : "outline"}
+                className={`rounded-md ${categoryPage === i + 1 ? 'bg-black text-white' : ''}`}
+                onClick={() => setCategoryPage(i + 1)}
+              >
+                {i + 1}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={categoryPage === totalCategoryPages}
+              onClick={() => setCategoryPage(categoryPage + 1)}
+              className="rounded-md"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

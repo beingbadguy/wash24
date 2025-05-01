@@ -84,4 +84,39 @@ export const initialServices: Service[] = [
     orders: 2,
     priceVariations: [],
   },
-]; 
+];
+
+export interface PricingVariation {
+  id?: string;
+  itemType: string;
+  customerCategory: "MALE" | "FEMALE";
+  price: number;
+  description: string;
+  isActive: boolean;
+  laundryServiceId?: string;
+}
+
+export interface ServiceType {
+  id: string;
+  name: string;
+  description: string;
+  basePrice: number;
+  imageUrl: string | null;
+  isActive: boolean;
+  showOnHome: boolean;
+  sortOrder: number;
+  categoryId: string;
+  createdAt?: string;
+  updatedAt?: string;
+  pricingVariations: PricingVariation[];
+}
+
+export interface CategoryType {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl: string | null;
+  showOnHome: boolean;
+  sortOrder: number;
+  services?: ServiceType[];
+} 
